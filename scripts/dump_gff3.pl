@@ -52,24 +52,20 @@ sub core_to_gff3 {
   $serializer->print_main_header(undef, $db);
   my $sa = $db->get_adaptor("slice");
   my $ga = $db->get_adaptor("gene");
+  my $ta = $db->get_adaptor("transcript");
+  my $ea = $db->get_adaptor("exon");
   for my $slice (@{ $sa->fetch_all('toplevel') }) {
     $logger->debug("Dump slice " . $slice->seq_region_name);
-    # Genes
-    for my $gene (@{$ga->fetch_all_by_Slice($slice)}) {
-      $serializer->print_feature($gene);
-      # Transcripts
-      for my $transcript (@{$gene->get_all_Transcripts()}) {
-        $serializer->print_feature($transcript);
-        # Exons
-        for my $exon (@{$transcript->get_all_Exons()}) {
-          $serializer->print_feature($exon);
-        }
-        # CDSs
-        for my $cds (@{$transcript->get_all_CDS()}) {
-          $serializer->print_feature($cds);
-        }
-      }
+    $serializer->print_feature_list($ga->fetch_all_by_Slice($slice));
+    my @transcripts;
+    my @cdss;
+    for my $transcript (@{$ta->fetch_all_by_Slice($slice)}) {
+      push @transcripts, $transcript;
+      push @cdss, @{$transcript->get_all_CDS()};
     }
+    $serializer->print_feature_list(\@transcripts);
+    $serializer->print_feature_list($ea->fetch_all_by_Slice($slice));
+    $serializer->print_feature_list(\@cdss);
   }
   close $fh;
 }
