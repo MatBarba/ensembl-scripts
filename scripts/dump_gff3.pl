@@ -54,9 +54,21 @@ sub core_to_gff3 {
   my $ga = $db->get_adaptor("gene");
   for my $slice (@{ $sa->fetch_all('toplevel') }) {
     $logger->debug("Dump slice " . $slice->seq_region_name);
-    for my $feature (@{$ga->fetch_all_by_Slice($slice)}) {
-      $logger->debug("Dump gene " . $feature->stable_id);
-      $serializer->print_feature($feature);
+    # Genes
+    for my $gene (@{$ga->fetch_all_by_Slice($slice)}) {
+      $serializer->print_feature($gene);
+      # Transcripts
+      for my $transcript (@{$gene->get_all_Transcripts()}) {
+        $serializer->print_feature($transcript);
+        # Exons
+        for my $exon (@{$transcript->get_all_Exons()}) {
+          $serializer->print_feature($exon);
+        }
+        # CDSs
+        for my $cds (@{$transcript->get_all_CDS()}) {
+          $serializer->print_feature($cds);
+        }
+      }
     }
   }
   close $fh;
