@@ -1,0 +1,109 @@
+#!/usr/bin/env perl
+=head1 LICENSE
+
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016-2024] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
+
+use strict;
+use warnings;
+use autodie;
+
+use Getopt::Long qw(:config no_ignore_case);
+use Log::Log4perl qw( :easy ); 
+Log::Log4perl->easy_init($WARN); 
+my $logger = get_logger(); 
+
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Utils::IO::GFFSerializer;
+
+###############################################################################
+# MAIN
+# Get command line args
+my %opt = %{ opt_check() };
+my $core_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+  -host => $opt{host},
+  -user => $opt{user},
+  -pass => $opt{pass},
+  -port => $opt{port},
+  -dbname => $opt{dbname}
+);
+core_to_gff3($core_db, $opt{output});
+
+sub core_to_gff3 {
+  my ($db, $output) = @_;
+
+  open my $fh, "<", $output;
+  my $serializer = Bio::EnsEMBL::Utils::IO::GFFSerializer->new($fh);
+  $serializer->print_main_header(undef, $db);
+  my $sa = $db->get_adaptor("slice");
+  my $ga = $db->get_adaptor("gene");
+  for my $slice (@{ $sa->fetch_all('toplevel') }) {
+    for my $feature (@{$ga->fetch_all_by_Slice($slice)}) {
+      $serializer->print_feature($slice);
+    }
+  }
+  close $fh;
+}
+
+###############################################################################
+# Parameters and usage
+sub usage {
+  my $error = shift;
+  my $help = '';
+  if ($error) {
+    $help = "[ $error ]\n";
+  }
+  $help .= <<'EOF';
+    Dump gene models from a core database to a GFF3 file
+
+    --host <str> : Host to MYSQL server
+    --port <int> : Port to MYSQL server
+    --user <str> : User to MYSQL server
+    --pass <str> : Password to MYSQL server
+    --dbname <str> : Database name on the MYSQL server
+    --output <path> : Path where to write the GFF3 file
+    
+    --help            : show this help message
+    --verbose         : show detailed progress
+    --debug           : show even more information (for debugging purposes)
+EOF
+  print STDERR "$help\n";
+  exit(1);
+}
+
+sub opt_check {
+  my %opt = ();
+  GetOptions(\%opt,
+    "host=s",
+    "port=s",
+    "user=s",
+    "pass=s",
+    "dbname=s",
+    "output=s",
+    "help",
+    "verbose",
+    "debug",
+  );
+
+  usage("Server params needed") unless $opt{host} and $opt{port} and $opt{user};
+  usage() if $opt{help};
+  Log::Log4perl->easy_init($INFO) if $opt{verbose};
+  Log::Log4perl->easy_init($DEBUG) if $opt{debug};
+  return \%opt;
+}
+
+__END__
