@@ -41,19 +41,22 @@ my $core_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
   -port => $opt{port},
   -dbname => $opt{dbname}
 );
-core_to_gff3($core_db, $opt{output});
+$logger->debug("Core db loaded");
+core_to_gff3($core_db);
 
 sub core_to_gff3 {
-  my ($db, $output) = @_;
+  my ($db) = @_;
 
-  open my $fh, "<", $output;
+  my $fh = *STDOUT;
   my $serializer = Bio::EnsEMBL::Utils::IO::GFFSerializer->new($fh);
   $serializer->print_main_header(undef, $db);
   my $sa = $db->get_adaptor("slice");
   my $ga = $db->get_adaptor("gene");
   for my $slice (@{ $sa->fetch_all('toplevel') }) {
+    $logger->debug("Dump slice " . $slice->seq_region_name);
     for my $feature (@{$ga->fetch_all_by_Slice($slice)}) {
-      $serializer->print_feature($slice);
+      $logger->debug("Dump gene " . $feature->stable_id);
+      $serializer->print_feature($feature);
     }
   }
   close $fh;
@@ -75,7 +78,6 @@ sub usage {
     --user <str> : User to MYSQL server
     --pass <str> : Password to MYSQL server
     --dbname <str> : Database name on the MYSQL server
-    --output <path> : Path where to write the GFF3 file
     
     --help            : show this help message
     --verbose         : show detailed progress
@@ -93,7 +95,6 @@ sub opt_check {
     "user=s",
     "pass=s",
     "dbname=s",
-    "output=s",
     "help",
     "verbose",
     "debug",
