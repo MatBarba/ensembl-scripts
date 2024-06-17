@@ -9,20 +9,21 @@ RUN apt-get -y install bioperl git build-essential cpanminus
 ARG SRC=/src
 RUN mkdir $SRC
 WORKDIR $SRC
-RUN git clone https://github.com/Ensembl/ensembl-git-tools.git
-ENV PATH="${SRC}/ensembl-git-tools/bin:${PATH}"
-RUN git ensembl --depth 0 --clone api --branch "release/${RELEASE}"
+RUN git clone --depth 1 -b release/${RELEASE} https://github.com/Ensembl/ensembl.git
+# ENV PATH="${SRC}/ensembl-git-tools/bin:${PATH}"
+# RUN git ensembl --depth 0 --clone api --branch "release/${RELEASE}"
 
 ENV PERL5LIB="${PERL5LIB}:${SRC}/ensembl/modules"
-ENV PERL5LIB="${PERL5LIB}:${SRC}/ensembl-compara/modules"
-ENV PERL5LIB="${PERL5LIB}:${SRC}/ensembl-variation/modules"
-ENV PERL5LIB="${PERL5LIB}:${SRC}/ensembl-funcgen/modules"
+# ENV PERL5LIB="${PERL5LIB}:${SRC}/ensembl-compara/modules"
+# ENV PERL5LIB="${PERL5LIB}:${SRC}/ensembl-variation/modules"
+# ENV PERL5LIB="${PERL5LIB}:${SRC}/ensembl-funcgen/modules"
 
 RUN apt -y install zlib1g-dev
 RUN cpanm --installdeps $SRC/ensembl
 
 # Complicated to install Bio::DB::BigFile
 # RUN cpanm --installdeps $SRC/ensembl-io
+
 # RUN cpanm --installdeps $SRC/ensembl-metadata
 # RUN cpanm --installdeps $SRC/ensembl-compara
 # RUN cpanm --installdeps $SRC/ensembl-variation
