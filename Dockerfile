@@ -3,42 +3,26 @@ FROM  ubuntu:24.04
 ARG RELEASE=112
 
 RUN apt-get update && apt-get -y upgrade
-RUN apt-get -y install bioperl git build-essential cpanminus
+RUN apt-get -y install bioperl git cpanminus
+# Needed by ensembl cpanfile
+RUN apt -y install build-essential zlib1g-dev
+RUN apt-get clean
 
 # Intall base Ensembl API
 ARG SRC=/src
 RUN mkdir $SRC
 WORKDIR $SRC
 RUN git clone --depth 1 -b release/${RELEASE} https://github.com/Ensembl/ensembl.git
-# ENV PATH="${SRC}/ensembl-git-tools/bin:${PATH}"
-# RUN git ensembl --depth 0 --clone api --branch "release/${RELEASE}"
-
 ENV PERL5LIB="${PERL5LIB}:${SRC}/ensembl/modules"
-# ENV PERL5LIB="${PERL5LIB}:${SRC}/ensembl-compara/modules"
-# ENV PERL5LIB="${PERL5LIB}:${SRC}/ensembl-variation/modules"
-# ENV PERL5LIB="${PERL5LIB}:${SRC}/ensembl-funcgen/modules"
-
-RUN apt -y install zlib1g-dev
-RUN cpanm --installdeps $SRC/ensembl
-
-# Complicated to install Bio::DB::BigFile
-# RUN cpanm --installdeps $SRC/ensembl-io
-
-# RUN cpanm --installdeps $SRC/ensembl-metadata
-# RUN cpanm --installdeps $SRC/ensembl-compara
-# RUN cpanm --installdeps $SRC/ensembl-variation
-# RUN cpanm --installdeps $SRC/ensembl-funcgen
+RUN cpanm --quiet --notest --installdeps $SRC/ensembl
 
 # Additional scripts to actually use the API
 ADD cpanfile ${SRC}/
-RUN cpanm --installdeps $SRC
+RUN cpanm --quiet --notest --installdeps $SRC
 ENV SCRIPT_DIR=$SRC/scripts
 RUN mkdir $SCRIPT_DIR
 ADD scripts/* ${SCRIPT_DIR}
 ENV PATH="${PATH}:${SCRIPT_DIR}"
-
-# End
-# RUN apt-get clean
 
 CMD show_registry.pm
 
