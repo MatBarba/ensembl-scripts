@@ -13,8 +13,10 @@ ARG SRC=/src
 RUN mkdir $SRC
 WORKDIR $SRC
 RUN git clone --depth 1 -b release/${RELEASE} https://github.com/Ensembl/ensembl.git
+RUN git clone --depth 1 -b release/${RELEASE} https://github.com/Ensembl/ensembl-io.git
 ENV PERL5LIB="${PERL5LIB}:${SRC}/ensembl/modules"
-RUN cpanm --quiet --notest --installdeps $SRC/ensembl
+ENV PERL5LIB="${PERL5LIB}:${SRC}/ensembl-io/modules"
+RUN cpanm --quiet --notest --installdeps "$SRC/ensembl"
 
 # Additional scripts to actually use the API
 ADD cpanfile ${SRC}/
@@ -24,7 +26,7 @@ RUN mkdir $SCRIPT_DIR
 ADD scripts/* ${SCRIPT_DIR}
 ENV PATH="${PATH}:${SCRIPT_DIR}"
 
-CMD show_registry.pm
+CMD "show_registry.pl"
 
 LABEL base.image="ensembl-scripts"
 LABEL version="0.1"
