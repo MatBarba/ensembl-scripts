@@ -6,6 +6,7 @@ RUN apt-get update && apt-get -y upgrade
 RUN apt-get -y install bioperl git cpanminus
 # Needed by ensembl cpanfile
 RUN apt -y install build-essential zlib1g-dev
+RUN apt -y install genometools
 RUN apt-get clean
 
 # Intall base Ensembl API
