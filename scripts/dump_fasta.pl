@@ -41,7 +41,6 @@ my $core_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
   -port => $opt{port},
   -dbname => $opt{dbname}
 );
-$logger->debug("Core db loaded");
 if ($opt{type} eq "dna") {
   dump_dna($core_db);
 } elsif ($opt{type} eq "protein") {
@@ -73,9 +72,8 @@ sub dump_protein {
 
   for my $slice (@{ $sa->fetch_all('toplevel') }) {
     for my $transcript (@{ $ta->fetch_all_by_Slice($slice) }) {
-      my $translation = $transcript->translation();
-      next if not $translation;
       my $seq = $transcript->translate();
+      next if not $seq;
       $serializer->print_Seq($seq);
     }
   }
