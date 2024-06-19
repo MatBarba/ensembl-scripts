@@ -44,6 +44,8 @@ my $core_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 $logger->debug("Core db loaded");
 if ($opt{type} eq "dna") {
   dump_dna($core_db);
+} elsif ($opt{type} eq "protein") {
+  dump_protein($core_db);
 } else {
   usage("Sequence type not supported: $opt{type}");
 }
@@ -57,6 +59,25 @@ sub dump_dna {
 
   for my $slice (@{ $sa->fetch_all('toplevel') }) {
     $serializer->print_Seq($slice);
+  }
+  close $fh;
+}
+
+sub dump_protein {
+  my ($db) = @_;
+  
+  my $fh = *STDOUT;
+  my $serializer = Bio::EnsEMBL::Utils::IO::FASTASerializer->new($fh);
+  my $sa = $db->get_adaptor("slice");
+  my $ta = $db->get_adaptor("transcript");
+
+  for my $slice (@{ $sa->fetch_all('toplevel') }) {
+    for my $transcript (@{ $ta->fetch_all_by_Slice($slice) }) {
+      my $translation = $transcript->translation();
+      next if not $translation;
+      my $seq = $transcript->translate();
+      $serializer->print_Seq($seq);
+    }
   }
   close $fh;
 }
