@@ -58,17 +58,19 @@ sub core_to_gff3 {
   $serializer->print_feature_list($ga->fetch_all());
   my @transcripts;
   my @cdss;
+  my @exons;
   $logger->debug("Prepare transcripts and CDSs...");
   for my $transcript (@{$ta->fetch_all()}) {
     push @transcripts, $transcript;
     push @cdss, @{$transcript->get_all_CDS()};
+    push @exons, @{$transcript->get_all_ExonTranscripts()};
   }
   $logger->debug("Dump transcripts...");
   $serializer->print_feature_list(\@transcripts);
   $logger->debug("Dump CDSs...");
   $serializer->print_feature_list(\@cdss);
   $logger->debug("Dump exons...");
-  $serializer->print_feature_list($ea->fetch_all());
+  $serializer->print_feature_list(\@exons);
   close $fh;
 }
 
