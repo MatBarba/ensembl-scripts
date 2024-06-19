@@ -42,7 +42,11 @@ my $core_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
   -dbname => $opt{dbname}
 );
 $logger->debug("Core db loaded");
-dump_dna($core_db);
+if ($opt{type} eq "dna") {
+  dump_dna($core_db);
+} else {
+  usage("Sequence type not supported: $opt{type}");
+}
 
 sub dump_dna {
   my ($db) = @_;
@@ -66,13 +70,15 @@ sub usage {
     $help = "[ $error ]\n";
   }
   $help .= <<'EOF';
-    Dump FASTA DNA from a core database to a FASTA file
+    Dump sequences from a core database to a FASTA file
 
     --host <str> : Host to MYSQL server
     --port <int> : Port to MYSQL server
     --user <str> : User to MYSQL server
     --pass <str> : Password to MYSQL server
     --dbname <str> : Database name on the MYSQL server
+
+    --type <str> : Type of sequence to dump (dna, protein)
     
     --help            : show this help message
     --verbose         : show detailed progress
@@ -90,12 +96,14 @@ sub opt_check {
     "user=s",
     "pass=s",
     "dbname=s",
+    "type=s",
     "help",
     "verbose",
     "debug",
   );
 
   usage("Server params needed") unless $opt{host} and $opt{port} and $opt{user};
+  usage("Type of sequence needed") unless $opt{type};
   usage() if $opt{help};
   Log::Log4perl->easy_init($INFO) if $opt{verbose};
   Log::Log4perl->easy_init($DEBUG) if $opt{debug};
