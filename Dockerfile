@@ -2,14 +2,21 @@ FROM  ubuntu:24.04
 
 ARG RELEASE=112
 
-RUN apt-get update && apt-get -y upgrade
-RUN apt-get -y install bioperl git cpanminus
-# Needed by ensembl cpanfile
-RUN apt -y install build-essential zlib1g-dev
-RUN apt -y install genometools
-RUN apt-get clean
+RUN apt-get update && apt-get -y upgrade \
+    && apt -y install \
+        bioperl \
+        git \
+        cpanminus \
+        # Needed by ensembl cpanfile
+        build-essential \
+        zlib1g-dev \
+        # Extra to use gt
+        genometools \
+        # mysql_config for DBD::mysql
+        libmariadb-dev-compat \
+        && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Intall base Ensembl API
+# Install base Ensembl API
 ARG SRC=/src
 RUN mkdir $SRC
 WORKDIR $SRC
@@ -21,12 +28,14 @@ RUN cpanm --quiet --notest --installdeps "$SRC/ensembl"
 ADD cpanfile ${SRC}/
 RUN cpanm --quiet --notest --installdeps $SRC
 
+RUN apt -y remove build-essential git && rm -rf /var/lib/apt/lists/*
+
 # Perl and Path variables
 ENV PERL5LIB="${PERL5LIB}:${SRC}/ensembl/modules"
+ENV PERL5LIB="${PERL5LIB}:${SRC}/ensembl-io/modules"
 ENV PATH="${PATH}:${SRC}/ensembl/misc-scripts/canonical_transcripts"
 ENV PATH="${PATH}:${SRC}/ensembl/misc-scripts/meta_coord"
 RUN chmod u+x -R "${SRC}/ensembl/misc-scripts"
-ENV PERL5LIB="${PERL5LIB}:${SRC}/ensembl-io/modules"
 
 # Additional scripts to actually use the API
 ENV SCRIPT_DIR=$SRC/scripts
