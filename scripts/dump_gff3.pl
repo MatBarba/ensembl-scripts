@@ -54,23 +54,18 @@ sub core_to_gff3 {
   my $ga = $db->get_adaptor("gene");
   my $ta = $db->get_adaptor("transcript");
   my $ea = $db->get_adaptor("exon");
-  $logger->debug("Dump genes...");
-  $serializer->print_feature_list($ga->fetch_all());
-  my @transcripts;
-  my @cdss;
-  my @exons;
-  $logger->debug("Prepare transcripts and CDSs...");
-  for my $transcript (@{$ta->fetch_all()}) {
-    push @transcripts, $transcript;
-    push @cdss, @{$transcript->get_all_CDS()};
-    push @exons, @{$transcript->get_all_ExonTranscripts()};
+
+  for my $slice (@{ $sa->fetch_all('toplevel') }) {
+    $logger->debug("Dump slice " . $slice->seq_region_name);
+    for my $gene (@{ $ga->fetch_all_by_Slice($slice) }) {
+      $serializer->print_feature($gene);
+      foreach my $transcript (@{ $gene->get_all_Transcripts() }) {
+        $serializer->print_feature($transcript);
+        $serializer->print_feature_list($transcript->get_all_CDS());
+        $serializer->print_feature_list($transcript->get_all_ExonTranscripts());
+      }
+    }
   }
-  $logger->debug("Dump transcripts...");
-  $serializer->print_feature_list(\@transcripts);
-  $logger->debug("Dump CDSs...");
-  $serializer->print_feature_list(\@cdss);
-  $logger->debug("Dump exons...");
-  $serializer->print_feature_list(\@exons);
   close $fh;
 }
 
