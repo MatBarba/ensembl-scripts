@@ -28,7 +28,15 @@ Log::Log4perl->easy_init($WARN);
 my $logger = get_logger(); 
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Utils::IO::GFFSerializer;
+use Bio::EnsEMBL::Utils::IO::FASTASerializer;
+
+my %default = (
+  'chunk_factor'          => 1000,
+  'line_width'            => 80,
+
+  'only_canonical' => 0,
+  'skip_stop_codons' => 0,
+);
 
 ###############################################################################
 # MAIN
@@ -41,35 +49,31 @@ my $core_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
   -port => $opt{port},
   -dbname => $opt{dbname}
 );
-$logger->debug("Core db loaded");
-core_to_gff3($core_db);
 
-sub core_to_gff3 {
-  my ($db) = @_;
+my $fh = *STDOUT;
+my $serializer = Bio::EnsEMBL::Utils::IO::FASTASerializer->new($fh);
+my $sa = $core_db->get_adaptor("slice");
+my $ta = $core_db->get_adaptor("transcript");
 
-  my $fh = *STDOUT;
-  my $serializer = Bio::EnsEMBL::Utils::IO::GFFSerializer->new($fh);
-  $serializer->print_main_header(undef, $db);
-  my $sa = $db->get_adaptor("slice");
-  my $ga = $db->get_adaptor("gene");
-  my $ta = $db->get_adaptor("transcript");
-  my $ea = $db->get_adaptor("exon");
+for my $slice (@{ $sa->fetch_all('toplevel') }) {
+  $logger->debug("Get peptides from " . $slice->seq_region_name());
+  for my $transcript (@{ $ta->fetch_all_by_Slice($slice) }) {
+    next if $opt{only_canonical} and not $transcript->is_canonical;
+    my $seq = $transcript->translate();
+    next if not $seq;
+    # Standardize ID
+    $seq->display_id($transcript->translation->stable_id);
 
-  for my $slice (@{ $sa->fetch_all('toplevel') }) {
-    $logger->debug("Dump slice " . $slice->seq_region_name);
-    for my $gene (@{ $ga->fetch_all_by_Slice($slice) }) {
-      $serializer->print_feature($gene);
-      foreach my $transcript (@{ $gene->get_all_Transcripts() }) {
-        $serializer->print_feature($transcript);
-        $serializer->print_feature_list($transcript->get_all_CDS());
-        $serializer->print_feature_list($transcript->get_all_ExonTranscripts());
-        $serializer->print_feature_list($transcript->get_all_five_prime_UTRs());
-        $serializer->print_feature_list($transcript->get_all_three_prime_UTRs());
-      }
+    # Check sequence for stop codons
+    if ($opt{skip_stop_codons} and $seq->seq() =~ /\*/) {
+      my $seq_id = $seq->stable_id;
+      $logger->debug("Skip $seq_id with stop codons");
+      next;
     }
+    $serializer->print_Seq($seq);
   }
-  close $fh;
 }
+close $fh;
 
 ###############################################################################
 # Parameters and usage
@@ -79,14 +83,20 @@ sub usage {
   if ($error) {
     $help = "[ $error ]\n";
   }
-  $help .= <<'EOF';
-    Dump gene models from a core database to a GFF3 file
+  $help .= <<"EOF";
+    Dump sequences from a core database to a FASTA file
 
     --host <str> : Host to MYSQL server
     --port <int> : Port to MYSQL server
     --user <str> : User to MYSQL server
     --pass <str> : Password to MYSQL server
     --dbname <str> : Database name on the MYSQL server
+
+    Optional:
+    chunk_factor <int> : (default: $default{chunk_factor})
+    line_width <int> :  (default: $default{line_width})
+    only_canonical : Only export canonical translations (default: $default{only_canonical})
+    skip_stop_codons : Exclude proteins with stop codons within (default: $default{skip_stop_codons})
     
     --help            : show this help message
     --verbose         : show detailed progress
@@ -104,6 +114,11 @@ sub opt_check {
     "user=s",
     "pass=s",
     "dbname=s",
+    "type=s",
+    "chunk_factor=s",
+    "line_width=s",
+    "only_canonical",
+    "skip_stop_codons",
     "help",
     "verbose",
     "debug",
@@ -111,6 +126,13 @@ sub opt_check {
 
   usage("Server params needed") unless $opt{host} and $opt{port} and $opt{user};
   usage() if $opt{help};
+
+  # Defaults
+  $opt{chunk_factor} //= $default{chunk_factor};
+  $opt{line_width} //= $default{line_width};
+  $opt{only_canonical} //= $default{only_canonical};
+  $opt{skip_stop_codons} //= $default{skip_stop_codon};
+
   Log::Log4perl->easy_init($INFO) if $opt{verbose};
   Log::Log4perl->easy_init($DEBUG) if $opt{debug};
   return \%opt;

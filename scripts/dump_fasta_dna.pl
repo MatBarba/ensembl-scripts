@@ -30,6 +30,15 @@ my $logger = get_logger();
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Utils::IO::FASTASerializer;
 
+my %default = (
+  'chunk_factor'          => 1000,
+  'line_width'            => 80,
+
+  'dump_level'            => 'toplevel', # Alternative: seqlevel
+  'dump_cs_version'       => "",  # Version of coord_system, only if dump_level is a name
+  'include_non_reference' => 1,
+);
+
 ###############################################################################
 # MAIN
 # Get command line args
@@ -41,44 +50,26 @@ my $core_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
   -port => $opt{port},
   -dbname => $opt{dbname}
 );
-if ($opt{type} eq "dna") {
-  dump_dna($core_db);
-} elsif ($opt{type} eq "protein") {
-  dump_protein($core_db);
-} else {
-  usage("Sequence type not supported: $opt{type}");
+
+my $fh = *STDOUT;
+my $header_function = sub {
+  my $slice = shift;
+  return $slice->seq_region_name;
+};
+my $serializer = Bio::EnsEMBL::Utils::IO::FASTASerializer->new(
+  $fh,
+  $header_function,
+  $opt{chunk_factor},
+  $opt{line_width},
+);
+my $sa = $core_db->get_adaptor("slice");
+
+$logger->debug("Print sequences");
+my $slices = $sa->fetch_all($opt{dump_level}, $opt{dump_cs_version}, $opt{include_non_reference});
+foreach my $slice (sort { $b->length <=> $a->length } @$slices) {
+  $serializer->print_Seq($slice);
 }
-
-sub dump_dna {
-  my ($db) = @_;
-  
-  my $fh = *STDOUT;
-  my $serializer = Bio::EnsEMBL::Utils::IO::FASTASerializer->new($fh);
-  my $sa = $db->get_adaptor("slice");
-
-  for my $slice (@{ $sa->fetch_all('toplevel') }) {
-    $serializer->print_Seq($slice);
-  }
-  close $fh;
-}
-
-sub dump_protein {
-  my ($db) = @_;
-  
-  my $fh = *STDOUT;
-  my $serializer = Bio::EnsEMBL::Utils::IO::FASTASerializer->new($fh);
-  my $sa = $db->get_adaptor("slice");
-  my $ta = $db->get_adaptor("transcript");
-
-  for my $slice (@{ $sa->fetch_all('toplevel') }) {
-    for my $transcript (@{ $ta->fetch_all_by_Slice($slice) }) {
-      my $seq = $transcript->translate();
-      next if not $seq;
-      $serializer->print_Seq($seq);
-    }
-  }
-  close $fh;
-}
+close $fh;
 
 ###############################################################################
 # Parameters and usage
@@ -88,8 +79,8 @@ sub usage {
   if ($error) {
     $help = "[ $error ]\n";
   }
-  $help .= <<'EOF';
-    Dump sequences from a core database to a FASTA file
+  $help .= <<"EOF";
+    Dump DNA sequences from a core database to a FASTA file
 
     --host <str> : Host to MYSQL server
     --port <int> : Port to MYSQL server
@@ -97,7 +88,12 @@ sub usage {
     --pass <str> : Password to MYSQL server
     --dbname <str> : Database name on the MYSQL server
 
-    --type <str> : Type of sequence to dump (dna, protein)
+    Optional:
+    chunk_factor <int> : (default: $default{chunk_factor})
+    line_width <int> :  (default: $default{line_width})
+    dump_level <str> : Level of coord system to dump: toplevel or seqlevel (default: $default{dump_level})
+    dump_cs_version <str> : Version of coord_system if a name is provided for the dump_level (default: $default{dump_cs_version})
+    include_non_reference : Also include non-reference sequences (default: $default{include_non_reference})
     
     --help            : show this help message
     --verbose         : show detailed progress
@@ -115,15 +111,26 @@ sub opt_check {
     "user=s",
     "pass=s",
     "dbname=s",
-    "type=s",
+    "chunk_factor=s",
+    "line_width=s",
+    "dump_level=s",
+    "dump_cs_version=s",
+    "include_non_reference",
     "help",
     "verbose",
     "debug",
   );
 
   usage("Server params needed") unless $opt{host} and $opt{port} and $opt{user};
-  usage("Type of sequence needed") unless $opt{type};
   usage() if $opt{help};
+
+  # Defaults
+  $opt{chunk_factor} //= $default{chunk_factor};
+  $opt{line_width} //= $default{line_width};
+  $opt{dump_level} //= $default{dump_level};
+  $opt{dump_cs_version} //= $default{dump_cs_version};
+  $opt{include_non_reference} //= $default{include_non_reference};
+
   Log::Log4perl->easy_init($INFO) if $opt{verbose};
   Log::Log4perl->easy_init($DEBUG) if $opt{debug};
   return \%opt;
