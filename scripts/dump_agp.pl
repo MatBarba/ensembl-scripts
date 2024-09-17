@@ -175,9 +175,6 @@ sub get_coord_maps {
   return @pairs;
 }
 
-1;
-
-
 ###############################################################################
 # Parameters and usage
 sub usage {
