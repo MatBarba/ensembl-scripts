@@ -14,6 +14,9 @@ RUN apt-get update && apt-get -y upgrade \
         genometools \
         # mysql_config for DBD::mysql
         libmariadb-dev-compat \
+        python3-pip \
+        python3.12-venv \
+        pkg-config \
         && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install base Ensembl API
@@ -27,6 +30,13 @@ RUN cpanm --quiet --notest --installdeps "$SRC/ensembl"
 # This repo cpanfile
 ADD cpanfile ${SRC}/
 RUN cpanm --quiet --notest --installdeps $SRC
+
+# Genomio
+ENV VIRTUAL_ENV="$SRC/venv"
+RUN python3 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+RUN git clone --depth 1 https://github.com/Ensembl/ensembl-genomio.git
+RUN pip install --no-cache-dir ensembl-genomio/.
 
 RUN apt -y remove build-essential git && rm -rf /var/lib/apt/lists/*
 
